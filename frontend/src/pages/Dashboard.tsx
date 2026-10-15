@@ -1,6 +1,5 @@
-import { useAuth } from "@clerk/react";
 import { useEffect, useState } from "react";
-import { api } from "../api";
+import { useApi } from "../hooks/useApi";
 
 interface Member {
   id: string;
@@ -10,30 +9,20 @@ interface Member {
 }
 
 export default function Dashboard() {
-  const { getToken } = useAuth();
+  const api = useApi();
   const [members, setMembers] = useState<Member[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    (async () => {
-      try {
-        const token = await getToken();
-        const data = await api<Member[]>("/tenants/members", { token });
-        setMembers(data);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Failed to load");
-      }
-    })();
-  }, [getToken]);
+    api<Member[]>("/tenants/members").then(setMembers).catch((e) => setError(e.message));
+  }, [api]);
 
   return (
     <div>
-      <h2 className="text-2xl font-semibold text-gray-900 mb-4">Dashboard</h2>
+      <h2 className="text-2xl font-semibold text-gray-900 mb-6">Dashboard</h2>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
-          {error}
-        </div>
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">{error}</div>
       )}
 
       <div className="bg-white rounded-lg border border-gray-200 p-6">
