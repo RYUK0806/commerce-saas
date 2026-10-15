@@ -34,10 +34,10 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.database import Base
+from app.database import Base, TenantScopedMixin
 
 
-class Channel(Base):
+class Channel(TenantScopedMixin, Base):
     """
     A connected marketplace account.
 
@@ -53,13 +53,6 @@ class Channel(Base):
     """
 
     __tablename__ = "channels"
-
-    # --- Tenant isolation ---
-    tenant_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
-        nullable=False,
-        index=True,
-    )
 
     # --- Channel identity ---
     platform: Mapped[str] = mapped_column(
@@ -166,7 +159,7 @@ class Channel(Base):
         return f"<Channel {self.platform}:{self.name} status={self.status}>"
 
 
-class Listing(Base):
+class Listing(TenantScopedMixin, Base):
     """
     A variant published to a specific channel.
 
@@ -189,13 +182,6 @@ class Listing(Base):
     """
 
     __tablename__ = "listings"
-
-    # --- Tenant isolation ---
-    tenant_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
-        nullable=False,
-        index=True,
-    )
 
     # --- Which channel and which variant ---
     channel_id: Mapped[uuid.UUID] = mapped_column(

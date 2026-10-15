@@ -47,10 +47,10 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.database import Base
+from app.database import Base, TenantScopedMixin
 
 
-class InventoryItem(Base):
+class InventoryItem(TenantScopedMixin, Base):
     """
     Current stock levels for one variant at one location.
 
@@ -64,13 +64,6 @@ class InventoryItem(Base):
     """
 
     __tablename__ = "inventory_items"
-
-    # --- Tenant isolation ---
-    tenant_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
-        nullable=False,
-        index=True,
-    )
 
     # --- What this stock is ---
     variant_id: Mapped[uuid.UUID] = mapped_column(
@@ -157,7 +150,7 @@ class InventoryItem(Base):
         )
 
 
-class StockMovement(Base):
+class StockMovement(TenantScopedMixin, Base):
     """
     An immutable record of a stock change. The audit trail.
 
@@ -187,13 +180,6 @@ class StockMovement(Base):
     """
 
     __tablename__ = "stock_movements"
-
-    # --- Tenant isolation ---
-    tenant_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
-        nullable=False,
-        index=True,
-    )
 
     # --- Which inventory item changed ---
     inventory_item_id: Mapped[uuid.UUID] = mapped_column(

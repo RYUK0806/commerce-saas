@@ -22,6 +22,7 @@ Usage in a route:
         ...
 """
 
+import asyncio
 from dataclasses import dataclass
 from uuid import UUID
 
@@ -48,7 +49,7 @@ async def get_db():
 # PyJWKClient fetches and caches Clerk's public keys.
 # These keys are used to verify that the JWT was actually
 # signed by Clerk, not forged by an attacker.
-_jwks_client = PyJWKClient(settings.clerk_jwks_url)
+_jwks_client = PyJWKClient(f"{settings.clerk_issuer}/.well-known/jwks.json")
 
 
 @dataclass
@@ -76,32 +77,38 @@ async def get_current_user(
     token = authorization.removeprefix("Bearer ").strip()
 
     try:
-        # Get the signing key that matches this token's key ID
-        signing_key = _jwks_client.get_signing_key_from_jwt(token)
+        # PyJWKClient does blocking HTTP on a cache miss — keep it off the event loop
+        signing_key = await asyncio.to_thread(_jwks_client.get_signing_key_from_jwt, token)
 
         # Verify and decode the JWT
         # This checks: signature is valid, token hasn't expired,
-        # and the issuer matches Clerk
+        # the issuer is our Clerk instance, and the token names a user (sub)
         payload = jwt.decode(
             token,
             signing_key.key,
             algorithms=["RS256"],
-            options={"verify_aud": False},  # Clerk tokens don't always set audience
+            issuer=settings.clerk_issuer,
+            options={
+                "verify_aud": False,  # Clerk tokens don't always set audience
+                "require": ["exp", "sub"],
+            },
         )
     except jwt.ExpiredSignatureError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Session token has expired",
         )
-    except jwt.InvalidTokenError as e:
+    except jwt.PyJWTError:
+        # Base class also covers PyJWKClientError (unknown key ID);
+        # the reason isn't echoed back to avoid helping token forgers
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Invalid session token: {e}",
+            detail="Invalid session token",
         )
 
     # Extract user info from the verified token
     return AuthenticatedUser(
-        user_id=payload.get("sub", ""),
+        user_id=payload["sub"],
         email=payload.get("email"),
     )
 
@@ -129,14 +136,20 @@ async def get_tenant(
 ) -> TenantContext:
     # Import here to avoid circular imports — models import Base
     # from database.py, and this file is imported by routes
-    from app.modules.tenants.models import Membership
+    from app.modules.tenants.models import Membership, Tenant
 
-    # Find the user's active membership
+    # Find the user's active membership in an active tenant
     result = await db.execute(
-        select(Membership).where(
+        select(Membership)
+        .join(Tenant, Membership.tenant_id == Tenant.id)
+        .where(
             Membership.clerk_user_id == user.user_id,
             Membership.is_active == True,
+            Tenant.is_active == True,
         )
+        # shortcut: takes the oldest membership; add tenant selection when multi-tenant users land
+        .order_by(Membership.joined_at)
+        .limit(1)
     )
     membership = result.scalar_one_or_none()
 

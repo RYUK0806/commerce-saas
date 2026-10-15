@@ -17,10 +17,10 @@ from sqlalchemy import String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.database import Base
+from app.database import Base, TenantScopedMixin
 
 
-class AuditLog(Base):
+class AuditLog(TenantScopedMixin, Base):
     """
     An immutable record of a business action.
 
@@ -32,13 +32,6 @@ class AuditLog(Base):
     """
 
     __tablename__ = "audit_logs"
-
-    # --- Tenant isolation ---
-    tenant_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
-        nullable=False,
-        index=True,
-    )
 
     # --- Who ---
     actor: Mapped[str] = mapped_column(

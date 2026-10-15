@@ -16,7 +16,7 @@ Key design decisions:
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, func
+from sqlalchemy import DateTime, func, select
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -54,6 +54,10 @@ async_session_factory = async_sessionmaker(
 # - created_at: set automatically when the row is inserted
 # - updated_at: set automatically on every update
 class Base(DeclarativeBase):
+    # Fetch DB-generated values (updated_at) via RETURNING on UPDATE too;
+    # otherwise reading them after a save triggers a lazy load that fails in async
+    __mapper_args__ = {"eager_defaults": True}
+
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         primary_key=True,
@@ -70,3 +74,18 @@ class Base(DeclarativeBase):
         server_default=func.now(),
         onupdate=func.now(),
     )
+
+
+class TenantScopedMixin:
+    """Mixin — adds tenant_id (indexed, non-nullable) to any model."""
+
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        nullable=False,
+        index=True,
+    )
+
+
+def tenant_query(model, tenant_id: uuid.UUID):
+    """select(model) pre-filtered by tenant_id — the only way services should start a scoped query."""
+    return select(model).where(model.tenant_id == tenant_id)

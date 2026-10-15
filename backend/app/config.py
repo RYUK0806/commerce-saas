@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     - REDIS_URL: Redis connection for background jobs
     - CLERK_SECRET_KEY: Clerk backend API key for verifying session tokens
     - CLERK_PUBLISHABLE_KEY: Clerk frontend key (passed to the React app)
+    - CLERK_ISSUER: Clerk Frontend API URL, the expected token issuer
     - ENCRYPTION_KEY: Fernet key for encrypting channel credentials at rest
 
     Optional variables (safe defaults provided):
@@ -48,9 +49,9 @@ class Settings(BaseSettings):
     # Publishable key: safe to expose, used by the React frontend
     clerk_publishable_key: str
 
-    # Clerk JWKS URL: where we fetch the public keys to verify tokens
-    # Default works for most Clerk setups; override if using a custom domain
-    clerk_jwks_url: str = "https://api.clerk.com/.well-known/jwks.json"
+    # Clerk Frontend API URL, no trailing slash (e.g. https://xxx.clerk.accounts.dev).
+    # Tokens' "iss" must equal it; public keys are served at <issuer>/.well-known/jwks.json
+    clerk_issuer: str
 
     # --- Encryption ---
     # Fernet symmetric key for encrypting OAuth tokens in the database

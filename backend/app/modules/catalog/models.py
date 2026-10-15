@@ -36,10 +36,10 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.database import Base
+from app.database import Base, TenantScopedMixin
 
 
-class Product(Base):
+class Product(TenantScopedMixin, Base):
     """
     A product in the catalog — the top-level "thing" a business sells.
 
@@ -51,15 +51,6 @@ class Product(Base):
     """
 
     __tablename__ = "products"
-
-    # --- Tenant isolation ---
-    # Every query must include WHERE tenant_id = :tenant_id
-    tenant_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
-        nullable=False,
-        index=True,
-        comment="The business this product belongs to",
-    )
 
     # --- Product identity ---
     name: Mapped[str] = mapped_column(
@@ -147,7 +138,7 @@ class Product(Base):
         return f"<Product {self.name}>"
 
 
-class Variant(Base):
+class Variant(TenantScopedMixin, Base):
     """
     A specific sellable unit of a product.
 
@@ -162,13 +153,6 @@ class Variant(Base):
     """
 
     __tablename__ = "variants"
-
-    # --- Tenant isolation (denormalized for query performance) ---
-    tenant_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
-        nullable=False,
-        index=True,
-    )
 
     # --- Parent product ---
     product_id: Mapped[uuid.UUID] = mapped_column(
@@ -271,7 +255,7 @@ class Variant(Base):
         return f"<Variant {self.sku}>"
 
 
-class ProductImage(Base):
+class ProductImage(TenantScopedMixin, Base):
     """
     An image attached to a product.
 
@@ -283,13 +267,6 @@ class ProductImage(Base):
     """
 
     __tablename__ = "product_images"
-
-    # --- Tenant isolation ---
-    tenant_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
-        nullable=False,
-        index=True,
-    )
 
     # --- Parent product ---
     product_id: Mapped[uuid.UUID] = mapped_column(
@@ -325,6 +302,9 @@ class ProductImage(Base):
         server_default="0",
         comment="Controls image order in galleries",
     )
+
+    # --- Relationships ---
+    product: Mapped["Product"] = relationship(back_populates="images")
 
     def __repr__(self) -> str:
         return f"<ProductImage product={self.product_id} primary={self.is_primary}>"

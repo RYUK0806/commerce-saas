@@ -40,10 +40,10 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.database import Base
+from app.database import Base, TenantScopedMixin
 
 
-class Order(Base):
+class Order(TenantScopedMixin, Base):
     """
     An order from any sales channel.
 
@@ -54,13 +54,6 @@ class Order(Base):
     """
 
     __tablename__ = "orders"
-
-    # --- Tenant isolation ---
-    tenant_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
-        nullable=False,
-        index=True,
-    )
 
     # --- Source channel ---
     channel_id: Mapped[uuid.UUID | None] = mapped_column(
@@ -195,7 +188,7 @@ class Order(Base):
         return f"<Order {self.order_number} status={self.status}>"
 
 
-class OrderItem(Base):
+class OrderItem(TenantScopedMixin, Base):
     """
     A line item in an order — one variant, one quantity.
 
@@ -209,13 +202,6 @@ class OrderItem(Base):
     """
 
     __tablename__ = "order_items"
-
-    # --- Tenant isolation ---
-    tenant_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
-        nullable=False,
-        index=True,
-    )
 
     # --- Parent order ---
     order_id: Mapped[uuid.UUID] = mapped_column(
